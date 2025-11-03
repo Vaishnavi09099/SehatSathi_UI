@@ -48,6 +48,9 @@ export default function App() {
     }
   };
 
+  // reference to avoid unused-local errors while function may be used later
+  void getRoleIcon;
+
   // Show auth screen if user is not logged in
   if (!user) {
     return (

@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
 
@@ -130,6 +130,8 @@ export function DoctorDashboard() {
   };
 
   const handleStartConsultation = (id: string, type?: string) => {
+    // reference id to satisfy noUnusedParameters until implemented
+    void id;
     toast.success(`Starting ${type || "video"} consultation... / परामर्श शुरू हो रहा है...`, {
       description: "Connecting to consultation room..."
     });
@@ -291,7 +293,7 @@ export function DoctorDashboard() {
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
                       <Avatar className="w-16 h-16 border-2 border-[#52B788]">
                         <AvatarFallback className="bg-[#52B788] text-white" style={{ fontSize: '20px' }}>
-                          {appointment.patientName.charAt(0)}
+                          {appointment.patientName?.charAt(0) ?? ""}
                         </AvatarFallback>
                       </Avatar>
 

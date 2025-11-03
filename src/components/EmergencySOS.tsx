@@ -2,7 +2,7 @@ import { Phone, X, AlertTriangle, Navigation, Heart, Activity } from "lucide-rea
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Dialog, DialogContent } from "./ui/dialog";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { useState } from "react";
 
 interface EmergencySOSProps {

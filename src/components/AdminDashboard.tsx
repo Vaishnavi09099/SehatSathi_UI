@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface User {
   id: string;
@@ -109,14 +109,18 @@ export function AdminDashboard() {
   ]);
 
   const handleApproveUser = (userId: string, userName: string) => {
+    // reference the id to satisfy noUnusedParameters until logic is added
+    void userId;
     toast.success(`${userName} approved! / ${userName} को मंजूरी दी गई!`);
   };
 
   const handleRejectUser = (userId: string, userName: string) => {
+    void userId;
     toast.error(`${userName} rejected / ${userName} को अस्वीकार किया गया`);
   };
 
   const handleDeactivateUser = (userId: string, userName: string) => {
+    void userId;
     toast.info(`${userName} deactivated / ${userName} को निष्क्रिय किया गया`);
   };
 

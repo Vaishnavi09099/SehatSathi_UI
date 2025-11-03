@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Star, Video, Calendar, Clock, MapPin, ArrowRight, Filter, Upload, FileText, X, MessageSquare, CreditCard, Banknote, Smartphone, Wallet, CheckCircle2, Users } from "lucide-react";
+import { Search, Star, Clock, MapPin, ArrowRight, Filter, Upload, FileText, X, MessageSquare, CreditCard, Banknote, Smartphone, Wallet, CheckCircle2, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Calendar as CalendarComponent } from "./ui/calendar";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";

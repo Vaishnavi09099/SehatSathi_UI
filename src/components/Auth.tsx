@@ -5,8 +5,8 @@ import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { toast } from "sonner@2.0.3";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
+import { toast } from "sonner";
 
 interface AuthProps {
   onAuthSuccess: (user: { name: string; role: string; email: string }) => void;
@@ -65,9 +65,9 @@ export function Auth({ onAuthSuccess }: AuthProps) {
     };
 
     toast.success(`Welcome to SehatSathi!`, {
-      description: `${authMode === "register" ? "Account created" : "Logged in"} as ${userRoles.find(r => r.id === selectedRole)?.title}`,
-      duration: 3000,
-    });
+        description: `${authMode === "register" ? "Account created" : "Logged in"} as ${selectedRoleData?.title}`,
+        duration: 3000,
+      });
 
     onAuthSuccess(user);
   };

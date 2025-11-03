@@ -7,7 +7,7 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface Task {
   id: number;
@@ -141,7 +141,7 @@ const leaderboard = [
 
 export function RewardsSection() {
   const [currentPoints, setCurrentPoints] = useState(1850);
-  const [currentTier, setCurrentTier] = useState("Silver");
+  const [currentTier] = useState("Silver");
   const nextTierPoints = 2500;
   const progressToNext = (currentPoints / nextTierPoints) * 100;
 
@@ -217,7 +217,7 @@ export function RewardsSection() {
                   <span>{Math.round(progressToNext)}%</span>
                 </div>
                 <Progress value={progressToNext} className="h-3 bg-white/30" />
-                <div className="flex justify-between mt-2" style={{ fontSize: '12px' }} className="opacity-75">
+                <div className="flex justify-between mt-2 opacity-75" style={{ fontSize: '12px' }}>
                   <span>Bronze</span>
                   <span>Silver</span>
                   <span>Gold</span>

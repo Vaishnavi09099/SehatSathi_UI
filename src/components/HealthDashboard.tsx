@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { 
-  User, Calendar, Pill, Heart, Activity, FileText, Download,
+  Calendar, Pill, Heart, Activity, Download,
   TrendingUp, CheckCircle, AlertCircle, Clock, Droplet
 } from "lucide-react";
 import { Card } from "./ui/card";

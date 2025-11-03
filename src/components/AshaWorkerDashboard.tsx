@@ -6,7 +6,7 @@ import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Progress } from "./ui/progress";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface Patient {
   id: string;
