@@ -7,6 +7,8 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { toast } from "sonner";
+import { authAPI } from "../services/api";
+import socketService from "../services/socket";
 
 interface AuthProps {
   onAuthSuccess: (user: { name: string; role: string; email: string }) => void;
@@ -54,22 +56,64 @@ export function Auth({ onAuthSuccess }: AuthProps) {
     medicalId: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Mock authentication - in production, this would call an API
-    const user = {
-      name: formData.name || "Demo User",
-      role: selectedRole,
-      email: formData.email || `${selectedRole}@sehatsathi.in`,
-    };
-
-    toast.success(`Welcome to SehatSathi!`, {
+    // Validate required fields
+    if (authMode === "login") {
+      if (!formData.email.trim() || !formData.password.trim()) {
+        toast.error("Please enter both email and password");
+        return;
+      }
+    } else {
+      // Registration validation
+      if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.phone.trim()) {
+        toast.error("Please fill in all required fields");
+        return;
+      }
+      if (formData.password.length < 6) {
+        toast.error("Password must be at least 6 characters long");
+        return;
+      }
+    }
+    
+    try {
+      let response;
+      
+      if (authMode === "register") {
+        response = await authAPI.register({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          role: selectedRole,
+          village: formData.village,
+          medicalId: formData.medicalId
+        });
+      } else {
+        response = await authAPI.login({
+          email: formData.email,
+          password: formData.password
+        });
+      }
+      
+      // Store token
+      localStorage.setItem('authToken', response.token);
+      
+      // Connect to socket
+      socketService.connect(response.user._id);
+      
+      toast.success(`Welcome to SehatSathi!`, {
         description: `${authMode === "register" ? "Account created" : "Logged in"} as ${selectedRoleData?.title}`,
         duration: 3000,
       });
 
-    onAuthSuccess(user);
+      onAuthSuccess(response.user);
+      
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      toast.error(error.message || 'Authentication failed');
+    }
   };
 
   const selectedRoleData = userRoles.find((r) => r.id === selectedRole);
@@ -137,22 +181,24 @@ export function Auth({ onAuthSuccess }: AuthProps) {
             </Select>
           </div>
 
-          {/* Name field - Always visible but only required for register */}
-          <div>
-            <Label htmlFor="name">
-              Full Name | पूरा नाम {!isRegister && <span className="text-[#6c757d] text-xs">(optional)</span>}
-            </Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="Enter your full name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required={isRegister}
-              className="h-12 mt-2 border-2"
-              style={{ fontSize: '15px' }}
-            />
-          </div>
+          {/* Name field - Only for register */}
+          {isRegister && (
+            <div>
+              <Label htmlFor="name">
+                Full Name | पूरा नाम
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Enter your full name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                className="h-12 mt-2 border-2"
+                style={{ fontSize: '15px' }}
+              />
+            </div>
+          )}
 
           {/* Role-specific fields for register */}
           {isRegister && selectedRole === "patient" && (
@@ -185,10 +231,10 @@ export function Auth({ onAuthSuccess }: AuthProps) {
             </div>
           )}
 
-          {/* Email - Always visible */}
+          {/* Email - Always visible and required */}
           <div>
             <Label htmlFor="email">
-              Email | ईमेल {!isRegister && <span className="text-[#6c757d] text-xs">(optional for demo)</span>}
+              Email | ईमेल
             </Label>
             <Input
               id="email"
@@ -196,7 +242,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
               placeholder="your@email.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required={isRegister}
+              required
               className="h-12 mt-2 border-2"
               style={{ fontSize: '15px' }}
             />
@@ -219,19 +265,20 @@ export function Auth({ onAuthSuccess }: AuthProps) {
             </div>
           )}
 
-          {/* Password - Always visible */}
+          {/* Password - Always visible and required */}
           <div>
             <Label htmlFor="password">
-              Password | पासवर्ड {!isRegister && <span className="text-[#6c757d] text-xs">(optional for demo)</span>}
+              Password | पासवर्ड
             </Label>
             <div className="relative mt-2">
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder={isRegister ? "Create a password" : "Enter password"}
+                placeholder={isRegister ? "Create a password (min 6 characters)" : "Enter password"}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required={isRegister}
+                required
+                minLength={isRegister ? 6 : 1}
                 className="h-12 pr-12 border-2"
                 style={{ fontSize: '15px' }}
               />
@@ -245,12 +292,18 @@ export function Auth({ onAuthSuccess }: AuthProps) {
             </div>
           </div>
 
-          {/* Quick Demo Login Note */}
+          {/* Demo Accounts Info */}
           {!isRegister && (
             <div className="bg-[#E8F4F8] border-l-4 border-[#2C7DA0] p-3 rounded">
-              <p style={{ fontSize: '13px' }} className="text-[#212529]">
-                💡 <strong>Quick Demo:</strong> Just select a role and click Login for instant access!
+              <p style={{ fontSize: '13px' }} className="text-[#212529] mb-2">
+                💡 <strong>Demo Accounts (Password: demo123):</strong>
               </p>
+              <div style={{ fontSize: '12px' }} className="text-[#212529] space-y-1">
+                <div>👨‍⚕️ Doctor: doctor@sehatsathi.in</div>
+                <div>🏥 Patient: patient@sehatsathi.in</div>
+                <div>👩‍💼 ASHA: asha@sehatsathi.in</div>
+                <div>⚙️ Admin: admin@sehatsathi.in</div>
+              </div>
             </div>
           )}
 
@@ -273,6 +326,11 @@ export function Auth({ onAuthSuccess }: AuthProps) {
           <p style={{ fontSize: '12px' }} className="text-[#6c757d] mt-1">
             सहायता चाहिए? 1800-123-4567 पर कॉल करें (टोल फ्री)
           </p>
+          {!isRegister && (
+            <p style={{ fontSize: '11px' }} className="text-[#6c757d] mt-2">
+              New user? Switch to Register tab or use demo accounts above
+            </p>
+          )}
         </div>
       </Card>
     </div>

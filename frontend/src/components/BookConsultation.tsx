@@ -16,6 +16,9 @@ import {
 } from "./ui/dialog";
 import { Calendar as CalendarComponent } from "./ui/calendar";
 import { toast } from "sonner";
+import { usersAPI, appointmentsAPI } from "../services/api";
+import { VideoConsultation } from "./VideoConsultation";
+import { useEffect } from "react";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
@@ -33,9 +36,10 @@ interface Doctor {
   fee: number;
   available: string;
   image: string;
+  isVerified?: boolean;
 }
 
-const doctors: Doctor[] = [
+const mockDoctors: Doctor[] = [
   {
     id: 1,
     name: "Dr. Priya Sharma",
@@ -125,6 +129,10 @@ const doctors: Doctor[] = [
 export function BookConsultation() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showVideoConsultation, setShowVideoConsultation] = useState(false);
+  const [currentConsultation, setCurrentConsultation] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [uploadedDocuments, setUploadedDocuments] = useState<Array<{ name: string; size: string; type: string; file?: File }>>([]);
@@ -134,6 +142,45 @@ export function BookConsultation() {
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [filterSpecialty, setFilterSpecialty] = useState<string>("all");
+
+  // Load doctors from API
+  useEffect(() => {
+    loadDoctors();
+  }, [searchTerm, filterSpecialty]);
+
+  const loadDoctors = async () => {
+    try {
+      setLoading(true);
+      const response = await usersAPI.getDoctors({
+        specialty: filterSpecialty === 'all' ? undefined : filterSpecialty,
+        search: searchTerm || undefined
+      });
+      
+      // Transform API response to match frontend interface
+      const transformedDoctors = response.doctors.map((doc: any) => ({
+        id: doc._id,
+        name: doc.name,
+        nameHi: doc.name, // Use same name for Hindi
+        specialty: doc.doctorProfile?.specialty || 'General Physician',
+        specialtyHi: doc.doctorProfile?.specialty || 'सामान्य चिकित्सक',
+        experience: doc.doctorProfile?.experience || 5,
+        languages: doc.doctorProfile?.languages || ['Hindi', 'English'],
+        rating: doc.doctorProfile?.rating || 4.5,
+        reviews: doc.doctorProfile?.reviewCount || 100,
+        fee: doc.doctorProfile?.consultationFee || 299,
+        available: 'Today, 2:00 PM',
+        image: doc.profile?.avatar || `https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400`,
+        isVerified: doc.isVerified || false
+      }));
+      
+      setDoctors(transformedDoctors);
+    } catch (error) {
+      console.error('Error loading doctors:', error);
+      toast.error('Failed to load doctors');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredDoctors = doctors.filter(
     (doctor) => {
@@ -187,50 +234,77 @@ export function BookConsultation() {
     }
   };
 
-  const handleCompletePayment = () => {
+  const handleCompletePayment = async () => {
     if (!paymentMethod) {
       toast.error("Please select a payment method");
       return;
     }
 
     if (selectedDoctor && selectedDate && selectedTime) {
-      // Store appointment in localStorage
-      const appointment = {
-        id: Date.now().toString(),
-        doctorId: selectedDoctor.id,
-        doctorName: selectedDoctor.name,
-        doctorSpecialty: selectedDoctor.specialty,
-        date: selectedDate.toLocaleDateString(),
-        time: selectedTime,
-        fee: selectedDoctor.fee,
-        documents: uploadedDocuments.map(doc => ({ name: doc.name, size: doc.size, type: doc.type })),
-        message: chatMessage,
-        needAshaWorker: needAshaWorker,
-        paymentMethod: paymentMethod,
-        paymentStatus: "paid",
-        status: "pending",
-        createdAt: new Date().toISOString()
-      };
+      try {
+        setLoading(true);
+        
+        const appointmentData = {
+          doctorId: selectedDoctor.id,
+          appointmentDate: selectedDate.toISOString(),
+          timeSlot: selectedTime,
+          symptoms: chatMessage,
+          preConsultationMessage: chatMessage,
+          needAshaWorker: needAshaWorker,
+          paymentMethod: paymentMethod,
+          documents: uploadedDocuments.map(doc => ({
+            name: doc.name,
+            size: doc.size,
+            type: doc.type,
+            url: doc.file ? URL.createObjectURL(doc.file) : ''
+          }))
+        };
 
-      const existingAppointments = JSON.parse(localStorage.getItem("appointments") || "[]");
-      localStorage.setItem("appointments", JSON.stringify([...existingAppointments, appointment]));
+        const response = await appointmentsAPI.create(appointmentData);
+        
+        // Store appointment locally as backup
+        const existingAppointments = JSON.parse(localStorage.getItem("appointments") || "[]");
+        localStorage.setItem("appointments", JSON.stringify([...existingAppointments, response.appointment]));
 
-      const docsInfo = uploadedDocuments.length > 0 ? ` | ${uploadedDocuments.length} document(s) attached` : "";
-      const ashaInfo = needAshaWorker ? " | ASHA Worker assistance requested" : "";
-      toast.success(`Appointment booked with ${selectedDoctor.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}${docsInfo}${ashaInfo}`, {
-        description: `Payment of ₹${selectedDoctor.fee} via ${paymentMethod} successful. You will receive a confirmation SMS shortly.`,
-        duration: 5000,
-      });
-      
-      setSelectedDoctor(null);
-      setSelectedTime("");
-      setUploadedDocuments([]);
-      setChatMessage("");
-      setShowPayment(false);
-      setPaymentMethod("");
-      setNeedAshaWorker(false);
+        const docsInfo = uploadedDocuments.length > 0 ? ` | ${uploadedDocuments.length} document(s) attached` : "";
+        const ashaInfo = needAshaWorker ? " | ASHA Worker assistance requested" : "";
+        
+        toast.success(`Appointment booked with ${selectedDoctor.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}${docsInfo}${ashaInfo}`, {
+          description: `Payment of ₹${selectedDoctor.fee} via ${paymentMethod} successful. Consultation ID: ${response.appointment.consultationId}`,
+          duration: 5000,
+        });
+        
+        // Reset form
+        setSelectedDoctor(null);
+        setSelectedTime("");
+        setUploadedDocuments([]);
+        setChatMessage("");
+        setShowPayment(false);
+        setPaymentMethod("");
+        setNeedAshaWorker(false);
+        
+      } catch (error: any) {
+        console.error('Booking error:', error);
+        toast.error(error.message || 'Failed to book appointment');
+      } finally {
+        setLoading(false);
+      }
     }
   };
+
+  if (showVideoConsultation && currentConsultation) {
+    return (
+      <VideoConsultation
+        consultationId={currentConsultation.consultationId}
+        appointmentId={currentConsultation.appointmentId}
+        userRole="patient"
+        onEnd={() => {
+          setShowVideoConsultation(false);
+          setCurrentConsultation(null);
+        }}
+      />
+    );
+  }
 
   return (
     <section className="py-12 px-4 bg-gradient-to-b from-white to-[#F8F9FA]">
@@ -271,7 +345,16 @@ export function BookConsultation() {
           </Button>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading doctors...</p>
+          </div>
+        )}
+
         {/* Doctors Grid */}
+        {!loading && (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredDoctors.map((doctor) => (
             <Card 
@@ -285,9 +368,14 @@ export function BookConsultation() {
                   <AvatarFallback>{doctor.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <h3 style={{ fontSize: '18px', fontWeight: 600 }} className="text-[#212529] mb-1">
-                    {doctor.name}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 style={{ fontSize: '18px', fontWeight: 600 }} className="text-[#212529]">
+                      {doctor.name}
+                    </h3>
+                    {doctor.isVerified && (
+                      <Badge className="bg-[#52B788] text-white text-xs px-2 py-0.5">✓ Verified</Badge>
+                    )}
+                  </div>
                   <p style={{ fontSize: '14px' }} className="text-[#6c757d] mb-2">
                     {doctor.specialty}
                   </p>
@@ -346,6 +434,7 @@ export function BookConsultation() {
             </Card>
           ))}
         </div>
+        )}
 
         {/* Booking Dialog */}
         <Dialog open={!!selectedDoctor} onOpenChange={(open) => !open && setSelectedDoctor(null)}>
