@@ -15,6 +15,9 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { FloatingAIAssistant } from "./components/FloatingAIAssistant";
 import { Toaster } from "./components/ui/sonner";
 import { Heart, Facebook, Twitter, Instagram, Youtube, Mail, Phone, MapPin, LogOut } from "lucide-react";
+import { authAPI } from "./services/api";
+import socketService from "./services/socket";
+import { AppointmentsList } from "./components/AppointmentsList";
 import { Button } from "./components/ui/button";
 
 interface User {
@@ -33,9 +36,21 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setActiveTab("home");
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+      localStorage.removeItem('authToken');
+      socketService.disconnect();
+      setUser(null);
+      setActiveTab("home");
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still logout locally even if API call fails
+      localStorage.removeItem('authToken');
+      socketService.disconnect();
+      setUser(null);
+      setActiveTab("home");
+    }
   };
 
   const getRoleIcon = (role: string) => {
@@ -359,6 +374,9 @@ export default function App() {
       case "dashboard":
         return <HealthDashboard />;
       
+      case "appointments":
+        return <AppointmentsList userRole={user.role as 'patient' | 'doctor' | 'asha'} />;
+      
       case "rewards":
         return <RewardsSection />;
       
@@ -414,6 +432,7 @@ export default function App() {
         onTabChange={handleTabChange}
         onEmergencyClick={() => setShowEmergency(true)}
         notificationCount={3}
+        userRole={user.role}
       />
       
       <main className="animate-in fade-in duration-300">
@@ -465,6 +484,11 @@ export default function App() {
                 <li>
                   <button onClick={() => handleTabChange("dashboard")} className="opacity-75 hover:opacity-100 transition-opacity hover:text-[#52B788]">
                     My Health
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleTabChange("appointments")} className="opacity-75 hover:opacity-100 transition-opacity hover:text-[#52B788]">
+                    My Appointments
                   </button>
                 </li>
                 <li>

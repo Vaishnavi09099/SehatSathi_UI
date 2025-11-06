@@ -15,9 +15,10 @@ interface HeaderProps {
   onTabChange: (tab: string) => void;
   onEmergencyClick: () => void;
   notificationCount?: number;
+  userRole?: string;
 }
 
-export function Header({ activeTab, onTabChange, onEmergencyClick, notificationCount = 3 }: HeaderProps) {
+export function Header({ activeTab, onTabChange, onEmergencyClick, notificationCount = 3, userRole }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [language, setLanguage] = useState("en");
 
@@ -26,6 +27,7 @@ export function Header({ activeTab, onTabChange, onEmergencyClick, notificationC
     { id: "book", label: "Book Consultation", labelHi: "परामर्श बुक करें" },
     { id: "ai-chat", label: "AI Assistant", labelHi: "AI सहायक" },
     { id: "dashboard", label: "My Health", labelHi: "मेरा स्वास्थ्य" },
+    { id: "appointments", label: "Appointments", labelHi: "अपॉइंटमेंट" },
     { id: "rewards", label: "Rewards", labelHi: "पुरस्कार" },
   ];
 

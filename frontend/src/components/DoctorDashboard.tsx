@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { Calendar, Users, Video, Clock, TrendingUp, FileText, Bell, CheckCircle, XCircle, AlertCircle, Download, Eye, MessageSquare, CreditCard } from "lucide-react";
+import { Calendar, Users, Video, Clock, TrendingUp, FileText, Bell, CheckCircle, XCircle, AlertCircle, Download, Eye, MessageSquare, CreditCard, Edit, Settings } from "lucide-react";
+import { appointmentsAPI, usersAPI, consultationsAPI } from "../services/api";
+import { VideoConsultation } from "./VideoConsultation";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -30,64 +35,91 @@ interface Appointment {
 }
 
 export function DoctorDashboard() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [showDocumentsDialog, setShowDocumentsDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showNotificationsDialog, setShowNotificationsDialog] = useState(false);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showVideoConsultation, setShowVideoConsultation] = useState(false);
+  const [currentConsultation, setCurrentConsultation] = useState<any>(null);
+  const [doctorProfile, setDoctorProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [profileForm, setProfileForm] = useState({
+    specialty: '',
+    experience: '',
+    consultationFee: '',
+    languages: '',
+    qualifications: ''
+  });
 
-  // Load appointments from localStorage
   useEffect(() => {
-    const loadAppointments = () => {
-      const storedAppointments = JSON.parse(localStorage.getItem("appointments") || "[]");
-      // Add some default appointments if none exist
-      if (storedAppointments.length === 0) {
-        const defaultAppointments = [
-          {
-            id: "default-1",
-            patientName: "Priya Sharma",
-            patientNameHi: "प्रिया शर्मा",
-            time: "10:00 AM",
-            date: new Date().toLocaleDateString(),
-            type: "video" as const,
-            status: "pending" as const,
-            symptoms: "Fever and headache",
-            symptomsHi: "बुखार और सिरदर्द",
-            documents: [],
-            needAshaWorker: false,
-            paymentStatus: "paid",
-            fee: 199
-          },
-          {
-            id: "default-2",
-            patientName: "Rajesh Kumar",
-            patientNameHi: "राजेश कुमार",
-            time: "11:30 AM",
-            date: new Date().toLocaleDateString(),
-            type: "video" as const,
-            status: "confirmed" as const,
-            symptoms: "Stomach pain",
-            symptomsHi: "पेट दर्द",
-            documents: [],
-            needAshaWorker: true,
-            paymentStatus: "paid",
-            fee: 199
-          }
-        ];
-        setAppointments(defaultAppointments);
-      } else {
-        setAppointments(storedAppointments);
-      }
-    };
-
-    loadAppointments();
-    
-    // Set up an interval to check for new appointments
-    const interval = setInterval(loadAppointments, 2000);
+    loadDashboardData();
+    const interval = setInterval(loadDashboardData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const [recentPatients] = useState([
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [appointmentsRes, profileRes] = await Promise.all([
+        appointmentsAPI.getAll(),
+        usersAPI.getProfile()
+      ]);
+      
+      setAppointments(appointmentsRes.appointments || []);
+      setDoctorProfile(profileRes.user);
+      
+      if (profileRes.user?.doctorProfile) {
+        const dp = profileRes.user.doctorProfile;
+        setProfileForm({
+          specialty: dp.specialty || '',
+          experience: dp.experience?.toString() || '',
+          consultationFee: dp.consultationFee?.toString() || '',
+          languages: dp.languages?.join(', ') || '',
+          qualifications: dp.qualifications?.join(', ') || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showVideoConsultation && currentConsultation) {
+    return (
+      <VideoConsultation
+        consultationId={currentConsultation.consultationId}
+        appointmentId={currentConsultation.appointmentId}
+        userRole="doctor"
+        onEnd={() => {
+          setShowVideoConsultation(false);
+          setCurrentConsultation(null);
+          loadDashboardData();
+        }}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-white to-[#F8F9FA] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const recentPatients = appointments.slice(0, 5).map(apt => ({
+    name: apt.patient?.name || 'Unknown Patient',
+    nameHi: apt.patient?.name || 'अज्ञात रोगी',
+    lastVisit: new Date(apt.appointmentDate).toLocaleDateString(),
+    condition: apt.symptoms || 'General consultation',
+    conditionHi: apt.symptoms || 'सामान्य परामर्श'
+  })) || [
     {
       name: "Meera Patel",
       nameHi: "मीरा पटेल",
@@ -109,32 +141,60 @@ export function DoctorDashboard() {
       condition: "Asthma",
       conditionHi: "दमा"
     }
-  ]);
+  ];
 
-  const handleAcceptAppointment = (id: string) => {
-    const updatedAppointments = appointments.map(apt => 
-      apt.id === id ? { ...apt, status: "confirmed" as const } : apt
-    );
-    setAppointments(updatedAppointments);
-    localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
-    toast.success("Appointment Confirmed! / अपॉइंटमेंट पुष्टि की गई!");
+  const handleAcceptAppointment = async (id: string) => {
+    try {
+      await appointmentsAPI.updateStatus(id, 'confirmed');
+      await loadDashboardData();
+      toast.success("Appointment Confirmed!");
+    } catch (error) {
+      toast.error('Failed to confirm appointment');
+    }
   };
 
-  const handleRejectAppointment = (id: string) => {
-    const updatedAppointments = appointments.map(apt => 
-      apt.id === id ? { ...apt, status: "cancelled" as const } : apt
-    );
-    setAppointments(updatedAppointments);
-    localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
-    toast.error("Appointment Cancelled / अपॉइंटमेंट रद्द किया गया");
+  const handleRejectAppointment = async (id: string) => {
+    try {
+      await appointmentsAPI.updateStatus(id, 'cancelled');
+      await loadDashboardData();
+      toast.error("Appointment Cancelled");
+    } catch (error) {
+      toast.error('Failed to cancel appointment');
+    }
   };
 
-  const handleStartConsultation = (id: string, type?: string) => {
-    // reference id to satisfy noUnusedParameters until implemented
-    void id;
-    toast.success(`Starting ${type || "video"} consultation... / परामर्श शुरू हो रहा है...`, {
-      description: "Connecting to consultation room..."
-    });
+  const handleStartConsultation = async (appointmentId: string) => {
+    try {
+      const response = await consultationsAPI.start(appointmentId);
+      setCurrentConsultation({
+        consultationId: response.consultation.roomId,
+        appointmentId: appointmentId
+      });
+      setShowVideoConsultation(true);
+    } catch (error) {
+      toast.error('Failed to start consultation');
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      const doctorProfileData = {
+        doctorProfile: {
+          specialty: profileForm.specialty,
+          experience: parseInt(profileForm.experience) || 0,
+          consultationFee: parseInt(profileForm.consultationFee) || 0,
+          languages: profileForm.languages.split(',').map(l => l.trim()).filter(l => l),
+          qualifications: profileForm.qualifications.split(',').map(q => q.trim()).filter(q => q)
+        }
+      };
+      
+      await usersAPI.updateProfile(doctorProfileData);
+      await loadDashboardData();
+      setShowProfileDialog(false);
+      toast.success('Profile updated successfully!');
+    } catch (error) {
+      toast.error('Failed to update profile');
+    }
   };
 
   const handleViewDocuments = (appointment: Appointment) => {
@@ -286,31 +346,31 @@ export function DoctorDashboard() {
               <div className="space-y-4">
                 {appointments.map((appointment, index) => (
                   <div 
-                    key={appointment.id}
+                    key={appointment._id}
                     className="p-6 bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200 rounded-xl hover:shadow-lg transition-all duration-300 animate-in fade-in slide-in-from-right"
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
                       <Avatar className="w-16 h-16 border-2 border-[#52B788]">
                         <AvatarFallback className="bg-[#52B788] text-white" style={{ fontSize: '20px' }}>
-                          {appointment.patientName?.charAt(0) ?? ""}
+                          {appointment.patient?.name?.charAt(0) || "P"}
                         </AvatarFallback>
                       </Avatar>
 
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 style={{ fontSize: '18px', fontWeight: 600 }} className="text-[#212529]">
-                            {appointment.patientName}
+                            {appointment.patient?.name || 'Unknown Patient'}
                           </h3>
                           {getStatusBadge(appointment.status)}
                         </div>
                         <p style={{ fontSize: '14px' }} className="text-[#6c757d] mb-1">
-                          {appointment.patientNameHi}
+                          {appointment.patient?.name || 'अज्ञात रोगी'}
                         </p>
                         <div className="flex flex-wrap items-center gap-4 text-sm text-[#6c757d]">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4" />
-                            <span>{appointment.time}</span>
+                            <span>{appointment.timeSlot}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             {appointment.type === "video" ? <Video className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
@@ -319,10 +379,10 @@ export function DoctorDashboard() {
                         </div>
                         <div className="mt-2 p-3 bg-white border border-gray-200 rounded-lg">
                           <p style={{ fontSize: '13px', fontWeight: 600 }} className="text-[#212529] mb-1">
-                            Symptoms: {appointment.symptoms}
+                            Symptoms: {appointment.symptoms || 'Not specified'}
                           </p>
                           <p style={{ fontSize: '12px' }} className="text-[#6c757d]">
-                            लक्षण: {appointment.symptomsHi}
+                            लक्षण: {appointment.symptoms || 'निर्दिष्ट नहीं'}
                           </p>
                         </div>
                         
@@ -339,21 +399,21 @@ export function DoctorDashboard() {
                               {appointment.documents.length} Document(s)
                             </Button>
                           )}
-                          {appointment.message && (
+                          {appointment.preConsultationMessage && (
                             <Badge className="bg-blue-100 text-blue-700 border-0">
                               <MessageSquare className="w-3 h-3 mr-1" />
                               Has Message
                             </Badge>
                           )}
-                          {appointment.needAshaWorker && (
+                          {appointment.ashaWorker && (
                             <Badge className="bg-orange-100 text-orange-700 border-0">
-                              👥 ASHA Worker Needed
+                              👥 ASHA Worker Assigned
                             </Badge>
                           )}
-                          {appointment.paymentStatus === "paid" && (
+                          {appointment.payment?.status === "paid" && (
                             <Badge className="bg-green-100 text-green-700 border-0">
                               <CreditCard className="w-3 h-3 mr-1" />
-                              Paid ₹{appointment.fee}
+                              Paid ₹{appointment.payment.amount}
                             </Badge>
                           )}
                         </div>
@@ -363,14 +423,14 @@ export function DoctorDashboard() {
                         {appointment.status === "pending" && (
                           <>
                             <Button
-                              onClick={() => handleAcceptAppointment(appointment.id)}
+                              onClick={() => handleAcceptAppointment(appointment._id)}
                               className="bg-[#52B788] hover:bg-[#3a8a63] text-white min-h-[48px] flex-1"
                             >
                               <CheckCircle className="w-4 h-4 mr-2" />
                               Accept
                             </Button>
                             <Button
-                              onClick={() => handleRejectAppointment(appointment.id)}
+                              onClick={() => handleRejectAppointment(appointment._id)}
                               variant="outline"
                               className="border-2 border-red-500 text-red-500 hover:bg-red-50 min-h-[48px] flex-1"
                             >
@@ -381,7 +441,7 @@ export function DoctorDashboard() {
                         )}
                         {appointment.status === "confirmed" && (
                           <Button
-                            onClick={() => handleStartConsultation(appointment.id, appointment.type)}
+                            onClick={() => handleStartConsultation(appointment._id)}
                             className="bg-[#2C7DA0] hover:bg-[#1e5770] text-white min-h-[56px] px-6"
                           >
                             <Video className="w-5 h-5 mr-2" />

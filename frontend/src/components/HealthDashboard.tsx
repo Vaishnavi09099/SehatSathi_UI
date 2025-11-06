@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usersAPI, appointmentsAPI } from "../services/api";
 import { 
   Calendar, Pill, Heart, Activity, Download,
   TrendingUp, CheckCircle, AlertCircle, Clock, Droplet
@@ -11,61 +12,67 @@ import { Progress } from "./ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-const vitalData = [
-  { month: "Jan", bp: 120, sugar: 95 },
-  { month: "Feb", bp: 118, sugar: 98 },
-  { month: "Mar", bp: 122, sugar: 92 },
-  { month: "Apr", bp: 119, sugar: 96 },
-  { month: "May", bp: 121, sugar: 94 },
-  { month: "Jun", bp: 120, sugar: 93 },
-];
 
-const appointments = [
-  {
-    id: 1,
-    doctor: "Dr. Priya Sharma",
-    specialty: "General Physician",
-    date: "Oct 25, 2025",
-    time: "2:00 PM",
-    status: "upcoming",
-  },
-  {
-    id: 2,
-    doctor: "Dr. Rajesh Kumar",
-    specialty: "Pediatrician",
-    date: "Oct 20, 2025",
-    time: "10:00 AM",
-    status: "completed",
-  },
-];
-
-const prescriptions = [
-  {
-    id: 1,
-    medicine: "Paracetamol 500mg",
-    dosage: "1-0-1",
-    duration: "5 days",
-    taken: 3,
-    total: 15,
-  },
-  {
-    id: 2,
-    medicine: "Amoxicillin 250mg",
-    dosage: "1-1-1",
-    duration: "7 days",
-    taken: 12,
-    total: 21,
-  },
-];
-
-const vaccinations = [
-  { name: "COVID-19 Booster", status: "completed", date: "Jan 15, 2025" },
-  { name: "Influenza", status: "pending", date: "Due Nov 2025" },
-  { name: "Typhoid", status: "completed", date: "Jun 20, 2024" },
-];
 
 export function HealthDashboard() {
   const [healthScore] = useState(78);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const vitalData = [
+    { month: "Jan", bp: 120, sugar: 95 },
+    { month: "Feb", bp: 118, sugar: 98 },
+    { month: "Mar", bp: 122, sugar: 92 },
+    { month: "Apr", bp: 119, sugar: 96 },
+    { month: "May", bp: 121, sugar: 94 },
+    { month: "Jun", bp: 120, sugar: 93 },
+  ];
+
+  const prescriptions = [
+    {
+      id: 1,
+      medicine: "Paracetamol 500mg",
+      dosage: "1-0-1",
+      duration: "5 days",
+      taken: 3,
+      total: 15,
+    },
+    {
+      id: 2,
+      medicine: "Amoxicillin 250mg",
+      dosage: "1-1-1",
+      duration: "7 days",
+      taken: 12,
+      total: 21,
+    },
+  ];
+
+  const vaccinations = [
+    { name: "COVID-19 Booster", status: "completed", date: "Jan 15, 2025" },
+    { name: "Influenza", status: "pending", date: "Due Nov 2025" },
+    { name: "Typhoid", status: "completed", date: "Jun 20, 2024" },
+  ];
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [appointmentsRes, profileRes] = await Promise.all([
+        appointmentsAPI.getAll(),
+        usersAPI.getProfile()
+      ]);
+      setAppointments(appointmentsRes.appointments || []);
+      setUserProfile(profileRes.user);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <section className="py-12 px-4 bg-gradient-to-b from-white to-[#F8F9FA]">
@@ -89,17 +96,15 @@ export function HealthDashboard() {
                 <AvatarFallback>RK</AvatarFallback>
               </Avatar>
               <div>
-                <h3 style={{ fontSize: '24px', fontWeight: 700 }}>Ramesh Kumar</h3>
-                <p style={{ fontSize: '16px' }} className="opacity-90">रमेश कुमार</p>
+                <h3 style={{ fontSize: '24px', fontWeight: 700 }}>{userProfile?.name || 'Loading...'}</h3>
+                <p style={{ fontSize: '16px' }} className="opacity-90">{userProfile?.name || ''}</p>
                 <div className="flex gap-4 mt-2" style={{ fontSize: '14px' }}>
-                  <span>Age: 45 years</span>
+                  <span>Blood Group: {userProfile?.healthData?.bloodGroup || 'Not set'}</span>
                   <span>•</span>
-                  <span>Blood Group: O+</span>
-                  <span>•</span>
-                  <span>Village: Rampur</span>
+                  <span>Village: {userProfile?.profile?.address?.village || 'Not set'}</span>
                 </div>
                 <p style={{ fontSize: '13px' }} className="opacity-75 mt-1">
-                  Health ID: ABHA-1234-5678-9012
+                  Email: {userProfile?.email || ''}
                 </p>
               </div>
             </div>
@@ -153,37 +158,48 @@ export function HealthDashboard() {
               <Button variant="link" className="text-[#2C7DA0]">View All</Button>
             </div>
             <div className="space-y-4">
-              {appointments.map((apt) => (
-                <div
-                  key={apt.id}
-                  className="flex items-center justify-between p-4 bg-[#F8F9FA] rounded-xl hover:bg-[#E8F4F8] transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                      apt.status === "upcoming" ? "bg-[#52B788]" : "bg-[#6c757d]"
-                    }`}>
-                      <Calendar className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h4 style={{ fontSize: '16px', fontWeight: 600 }}>{apt.doctor}</h4>
-                      <p style={{ fontSize: '14px' }} className="text-[#6c757d]">{apt.specialty}</p>
-                      <p style={{ fontSize: '13px' }} className="text-[#6c757d] mt-1">
-                        {apt.date} at {apt.time}
-                      </p>
-                    </div>
-                  </div>
-                  {apt.status === "upcoming" && (
-                    <Button size="sm" className="bg-[#2C7DA0] hover:bg-[#236180]">
-                      Join Call
-                    </Button>
-                  )}
-                  {apt.status === "completed" && (
-                    <Badge className="bg-[#28A745] text-white border-0">
-                      Completed
-                    </Badge>
-                  )}
+              {loading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
                 </div>
-              ))}
+              ) : appointments.length > 0 ? (
+                appointments.slice(0, 3).map((apt) => (
+                  <div
+                    key={apt._id}
+                    className="flex items-center justify-between p-4 bg-[#F8F9FA] rounded-xl hover:bg-[#E8F4F8] transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        apt.status === "confirmed" ? "bg-[#52B788]" : "bg-[#6c757d]"
+                      }`}>
+                        <Calendar className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 style={{ fontSize: '16px', fontWeight: 600 }}>Dr. {apt.doctor?.name}</h4>
+                        <p style={{ fontSize: '14px' }} className="text-[#6c757d]">{apt.doctor?.doctorProfile?.specialty}</p>
+                        <p style={{ fontSize: '13px' }} className="text-[#6c757d] mt-1">
+                          {new Date(apt.appointmentDate).toLocaleDateString()} at {apt.timeSlot}
+                        </p>
+                      </div>
+                    </div>
+                    {apt.status === "confirmed" && (
+                      <Button size="sm" className="bg-[#2C7DA0] hover:bg-[#236180]">
+                        Join Call
+                      </Button>
+                    )}
+                    {apt.status === "completed" && (
+                      <Badge className="bg-[#28A745] text-white border-0">
+                        Completed
+                      </Badge>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No appointments found</p>
+                </div>
+              )}
             </div>
           </Card>
 

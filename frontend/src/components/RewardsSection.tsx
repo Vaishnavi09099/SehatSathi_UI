@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usersAPI, appointmentsAPI } from "../services/api";
 import { 
   Gift, Trophy, Star, Check, Users, Video, Pill, Heart,
   Sparkles, TrendingUp, Award, Target
@@ -31,7 +32,48 @@ interface Reward {
   available: boolean;
 }
 
-const tasks: Task[] = [
+export function RewardsSection() {
+  const [currentPoints, setCurrentPoints] = useState(0);
+  const [currentTier] = useState("Silver");
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userStats, setUserStats] = useState({ tasks: 0, checkups: 0, referrals: 0 });
+  const [loading, setLoading] = useState(true);
+  
+  const nextTierPoints = 2500;
+  const progressToNext = (currentPoints / nextTierPoints) * 100;
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      const [profileRes, appointmentsRes] = await Promise.all([
+        usersAPI.getProfile(),
+        appointmentsAPI.getAll()
+      ]);
+      
+      setUserProfile(profileRes.user);
+      
+      // Calculate points based on completed appointments
+      const completedAppointments = appointmentsRes.appointments?.filter((apt: any) => apt.status === 'completed') || [];
+      const calculatedPoints = completedAppointments.length * 100; // 100 points per completed appointment
+      setCurrentPoints(calculatedPoints);
+      
+      setUserStats({
+        tasks: completedAppointments.length,
+        checkups: completedAppointments.length,
+        referrals: 0 // This would come from referral system
+      });
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const tasks: Task[] = [
   {
     id: 1,
     title: "Complete Your Profile",
@@ -131,19 +173,15 @@ const rewards: Reward[] = [
   },
 ];
 
-const leaderboard = [
-  { rank: 1, name: "Priya S.", village: "Rampur", points: 2450 },
-  { rank: 2, name: "Rahul K.", village: "Sitapur", points: 2280 },
-  { rank: 3, name: "Anjali V.", village: "Bharatpur", points: 2150 },
-  { rank: 4, name: "You (Ramesh)", village: "Rampur", points: 1850 },
-  { rank: 5, name: "Sunita M.", village: "Durgapur", points: 1720 },
-];
+  const leaderboard = [
+    { rank: 1, name: "Priya S.", village: "Rampur", points: 2450 },
+    { rank: 2, name: "Rahul K.", village: "Sitapur", points: 2280 },
+    { rank: 3, name: "Anjali V.", village: "Bharatpur", points: 2150 },
+    { rank: 4, name: `You (${userProfile?.name?.split(' ')[0] || 'User'})`, village: userProfile?.profile?.address?.village || 'Your Village', points: currentPoints },
+    { rank: 5, name: "Sunita M.", village: "Durgapur", points: Math.max(currentPoints - 100, 0) },
+  ];
 
-export function RewardsSection() {
-  const [currentPoints, setCurrentPoints] = useState(1850);
-  const [currentTier] = useState("Silver");
-  const nextTierPoints = 2500;
-  const progressToNext = (currentPoints / nextTierPoints) * 100;
+
 
   const handleRedeem = (reward: Reward) => {
     if (currentPoints >= reward.cost) {
@@ -192,7 +230,7 @@ export function RewardsSection() {
                   <span style={{ fontSize: '18px', fontWeight: 700 }}>{currentTier} Tier</span>
                 </div>
               </div>
-              <h3 style={{ fontSize: '28px', fontWeight: 700 }} className="mb-2">Ramesh Kumar</h3>
+              <h3 style={{ fontSize: '28px', fontWeight: 700 }} className="mb-2">{userProfile?.name || 'Loading...'}</h3>
               <p style={{ fontSize: '16px' }} className="opacity-90">Health Champion 🌟</p>
             </div>
 
@@ -227,15 +265,15 @@ export function RewardsSection() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 text-center">
-                  <div style={{ fontSize: '20px', fontWeight: 700 }}>15</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700 }}>{userStats.tasks}</div>
                   <div style={{ fontSize: '12px' }} className="opacity-90">Tasks Done</div>
                 </div>
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 text-center">
-                  <div style={{ fontSize: '20px', fontWeight: 700 }}>8</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700 }}>{userStats.checkups}</div>
                   <div style={{ fontSize: '12px' }} className="opacity-90">Checkups</div>
                 </div>
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 text-center">
-                  <div style={{ fontSize: '20px', fontWeight: 700 }}>3</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700 }}>{userStats.referrals}</div>
                   <div style={{ fontSize: '12px' }} className="opacity-90">Referrals</div>
                 </div>
               </div>
